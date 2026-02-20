@@ -1,0 +1,32 @@
+# Render Blueprint: Ein Service = Frontend + Backend zusammen
+# https://render.com/docs/blueprint-spec
+#
+# Nach Push: Render Dashboard → "New" → "Blueprint" → Repo verbinden,
+# dann diese Datei auswählen. Oder "New" → "Web Service" und Einstellungen manuell setzen.
+
+services:
+  - type: web
+    name: hydrobreak
+    runtime: node
+    region: frankfurt
+    plan: free
+
+    # Repo-Root; Build baut Frontend, dann startet der Server aus server/
+    buildCommand: |
+      npm install
+      npm run build
+      cd server && npm install
+    startCommand: cd server && node index.js
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Optional: SMTP für E-Mail (Verifizierung, Passwort-Reset)
+      # - key: SMTP_HOST
+      #   sync: false
+      # - key: SMTP_USER
+      #   sync: false
+      # - key: SMTP_PASS
+      #   sync: false
+      # - key: MAIL_FROM
+      #   sync: false

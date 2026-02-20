@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 2026 SaaS design tokens – Akzentfarben mit WCAG-konformem Kontrast (Links/Buttons) */
+:root {
+  --app-bg: #fafafa;
+  --app-bg-elevated: #ffffff;
+  --app-border: #e5e5e5;
+  --app-border-subtle: #f0f0f0;
+  --app-surface: #ffffff;
+  --app-surface-hover: #f5f5f5;
+  --app-muted: #f5f5f5;
+  --app-muted-foreground: #737373;
+  --app-primary: #0f172a;
+  --app-primary-hover: #1e293b;
+  --app-primary-muted: #e2e8f0;
+  /* Akzent: dunkleres Blau für ≥4.5:1 Kontrast auf hellem Hintergrund (WCAG AA) */
+  --app-accent: #1d4ed8;
+  --app-accent-hover: #1e40af;
+}
+
+.dark {
+  --app-bg: #0a0a0a;
+  --app-bg-elevated: #141414;
+  --app-border: #262626;
+  --app-border-subtle: #1a1a1a;
+  --app-surface: #171717;
+  --app-surface-hover: #262626;
+  --app-muted: #262626;
+  --app-muted-foreground: #a3a3a3;
+  --app-primary: #fafafa;
+  --app-primary-hover: #e5e5e5;
+  --app-primary-muted: #404040;
+  /* Helleres Blau für guten Kontrast auf dunklem Hintergrund */
+  --app-accent: #60a5fa;
+  --app-accent-hover: #93c5fd;
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+  body {
+    background-color: var(--app-bg);
+    color: var(--app-primary);
+    @apply font-sans text-[15px] leading-relaxed;
+  }
+}
+
+@layer components {
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)] focus:ring-offset-2 focus:ring-offset-[var(--app-bg)];
+  }
+
+  /* Unified card style for dashboard */
+  .card {
+    background-color: var(--app-surface);
+    border: 1px solid var(--app-border-subtle);
+    @apply rounded-card shadow-card dark:shadow-card-dark;
+  }
+
+  .card-hover {
+    @apply card transition-colors duration-150 hover:border-[var(--app-border)];
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+}

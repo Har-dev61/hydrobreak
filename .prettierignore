@@ -1,0 +1,6 @@
+dist
+node_modules
+*.min.js
+public/sw.js
+dev-dist
+server/data
