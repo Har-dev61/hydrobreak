@@ -33,8 +33,9 @@ export default function RewardToast({ open, onClose, type = 'xp', value, badgeNa
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      aria-label={liveText}
     >
+      {/* Inhalt der Live-Region wird von Screenreadern beim Erscheinen vorgelesen */}
+      <span className="sr-only">{liveText}</span>
       <div className="rounded-card shadow-modal dark:shadow-modal-dark bg-app-surface border border-app-border px-4 py-3 flex items-center gap-3 animate-slide-up">
         {type === 'xp' ? (
           <>

@@ -37,6 +37,15 @@ HydroBreak ist so vorbereitet, dass **ein** Service sowohl die API als auch das 
 
 6. **Fertig:** Diese eine URL öffnen – dort läuft die App (Frontend + API). Es ist **kein** `VITE_API_URL` nötig, weil die API unter derselben Domain läuft.
 
+### Wenn nur „Not found“ oder eine Fehlerseite erscheint
+
+- **Render Dashboard** → dein Service → **„Logs“** (Runtime, nicht Build):
+  - Steht dort **„Frontend wird ausgeliefert aus: …“**? Dann wird das Frontend gefunden; das Problem liegt woanders.
+  - Steht **„Frontend dist/ nicht gefunden“**? Dann hat der Server den Build-Ordner nicht gefunden.
+- **Build-Logs** prüfen: Läuft `npm run build` durch und ohne Fehler? Es muss im **Projekt-Root** laufen (nicht nur in `server/`).
+- **Root Directory** in den Render-Einstellungen muss **leer** sein (oder auf den Repo-Root zeigen), damit `npm run build` und `dist/` im richtigen Verzeichnis entstehen.
+- Nach Änderungen an der Server-Logik: **„Manual Deploy“** → **„Deploy latest commit“** ausführen.
+
 ### Mit Blueprint (render.yaml)
 
 Im Repo liegt `render.yaml`. Statt manuell einen Web Service anzulegen:

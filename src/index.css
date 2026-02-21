@@ -72,6 +72,10 @@
   .animate-slide-up {
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+  /* Bottom-Navigation: Abstand über Home-Indicator (Notch-Geräte) */
+  .safe-area-pb {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -79,5 +83,14 @@
   .animate-slide-up {
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
+  }
+  .animate-intro-logo,
+  .animate-intro-subtitle {
+    animation-duration: 0.15s;
+    animation-delay: 0s;
+  }
+  .animate-intro-fade-out {
+    animation-duration: 0.2s;
+    animation-delay: 0.1s;
   }
 }

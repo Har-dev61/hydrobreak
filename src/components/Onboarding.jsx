@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { Droplets, Bell, CheckCircle2, ChevronRight } from 'lucide-react'
+import { Droplets, Bell, CheckCircle2, ChevronRight, Smartphone } from 'lucide-react'
 import { WATER_GOAL_OPTIONS } from '../constants'
 import { requestNotificationPermission } from '../utils/notifications'
 import { t } from '../i18n'
 
+const TOTAL_STEPS = 4
+
 /**
- * Kurzes 3-Schritte-Onboarding: Wasserziel → Benachrichtigungen → Fertig.
- * Führt neue Nutzer:innen in die App ein und erhöht die Chance, dass Notifications aktiviert werden.
+ * 4-Schritte-Onboarding: Wasserziel → Benachrichtigungen → Zusammenfassung → App zum Startbildschirm.
  */
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(1)
@@ -20,9 +21,8 @@ export default function Onboarding({ onComplete }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-8">
-        {/* Fortschritt */}
-        <div className="flex justify-center gap-2">
-          {[1, 2, 3].map((s) => (
+        <div className="flex justify-center gap-2" aria-label={`Schritt ${step} von ${TOTAL_STEPS}`}>
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -32,7 +32,6 @@ export default function Onboarding({ onComplete }) {
           ))}
         </div>
 
-        {/* Schritt 1: Wasserziel */}
         {step === 1 && (
           <div className="animate-fade-in">
             <div className="flex justify-center mb-6">
@@ -43,8 +42,11 @@ export default function Onboarding({ onComplete }) {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-center mb-1">
               {t('onboarding.step1Title')}
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
+            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-1">
               {t('onboarding.step1Question')}
+            </p>
+            <p className="text-gray-400 dark:text-gray-500 text-center text-xs mb-6">
+              {t('onboarding.step1Hint')}
             </p>
             <div className="flex flex-col gap-3">
               {WATER_GOAL_OPTIONS.map((opt) => (
@@ -72,7 +74,6 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Schritt 2: Benachrichtigungen */}
         {step === 2 && (
           <div className="animate-fade-in">
             <div className="flex justify-center mb-6">
@@ -83,8 +84,11 @@ export default function Onboarding({ onComplete }) {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-center mb-1">
               {t('onboarding.step2Title')}
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
+            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-2">
               {t('onboarding.step2Description')}
+            </p>
+            <p className="text-gray-400 dark:text-gray-500 text-center text-xs mb-6">
+              {t('onboarding.step2Benefits')}
             </p>
             <div className="flex flex-col gap-3">
               <button
@@ -112,7 +116,6 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Schritt 3: Fertig */}
         {step === 3 && (
           <div className="animate-fade-in">
             <div className="flex justify-center mb-6">
@@ -131,11 +134,47 @@ export default function Onboarding({ onComplete }) {
             </p>
             <button
               type="button"
-              onClick={handleFinish}
-              className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium"
+              onClick={() => setStep(4)}
+              className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium flex items-center justify-center gap-2"
             >
-              {t('onboarding.start')}
+              {t('onboarding.continue')} <ChevronRight className="w-5 h-5" />
             </button>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="animate-fade-in">
+            <div className="flex justify-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <Smartphone className="w-8 h-8 text-slate-600 dark:text-slate-400" />
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-center mb-1">
+              {t('onboarding.step4Title')}
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-4">
+              {t('onboarding.step4Description')}
+            </p>
+            <div className="text-left text-xs text-gray-500 dark:text-gray-400 space-y-2 mb-6 bg-white dark:bg-zinc-800 rounded-xl p-4 border border-gray-200 dark:border-zinc-600">
+              <p><strong className="text-gray-700 dark:text-gray-300">iOS:</strong> {t('onboarding.step4Ios')}</p>
+              <p><strong className="text-gray-700 dark:text-gray-300">Android:</strong> {t('onboarding.step4Android')}</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleFinish}
+                className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium"
+              >
+                {t('onboarding.start')}
+              </button>
+              <button
+                type="button"
+                onClick={handleFinish}
+                className="w-full py-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm"
+              >
+                {t('onboarding.step4Skip')}
+              </button>
+            </div>
           </div>
         )}
       </div>

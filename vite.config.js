@@ -34,6 +34,12 @@ export default defineConfig({
           { src: '/icon-512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
         ],
         categories: ['health', 'lifestyle', 'productivity'],
+        shortcuts: [
+          { name: 'Glas getrunken', short_name: 'Wasser', url: '/?action=drink', icons: [{ src: '/favicon.svg', sizes: '32x32', type: 'image/svg+xml' }] },
+          { name: 'Pause starten', short_name: 'Bewegung', url: '/?action=stand', icons: [{ src: '/favicon.svg', sizes: '32x32', type: 'image/svg+xml' }] },
+          { name: 'Augenpause', short_name: '20-20-20', url: '/?action=eye', icons: [{ src: '/favicon.svg', sizes: '32x32', type: 'image/svg+xml' }] },
+          { name: 'Statistik', short_name: 'Statistik', url: '/?tab=stats', icons: [{ src: '/favicon.svg', sizes: '32x32', type: 'image/svg+xml' }] },
+        ],
       },
       injectManifest: {
         injectionPoint: undefined,

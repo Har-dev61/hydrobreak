@@ -23,7 +23,8 @@ function QuickActions({ onDrink, onStand, onEye, feedback }) {
     'ring-2 ring-blue-500/30 border-blue-500/40 bg-blue-500/5'
 
   return (
-    <div className="grid grid-cols-3 gap-3" role="group" aria-label={t('quickActions.title')}>
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-3" role="group" aria-label={t('quickActions.title')}>
       <button
         type="button"
         onClick={onDrink}
@@ -87,6 +88,10 @@ function QuickActions({ onDrink, onStand, onEye, feedback }) {
           {labelFor('eye', t('quickActions.eye'))}
         </span>
       </button>
+      </div>
+      <p className="text-[10px] text-app-muted-foreground text-center" aria-hidden>
+        {t('quickActions.keyboardHint')}
+      </p>
     </div>
   )
 }

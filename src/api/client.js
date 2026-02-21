@@ -82,6 +82,19 @@ export const user = {
   putStats: (payload) => request('PUT', '/api/user/stats', payload),
   getGamification: () => request('GET', '/api/user/gamification'),
   putGamification: (payload) => request('PUT', '/api/user/gamification', payload),
+  postPushSubscription: (subscription) => request('POST', '/api/user/push-subscription', { subscription }),
+  postReminderSent: (type) => request('POST', '/api/user/reminder-sent', { type }),
+  /** Anonymisierter Rang: Prozentil (1–100, niedrig = besser). Backend liefert z. B. { percentile: 20, period: 'week' }. */
+  getLeaderboardPercentile: () => request('GET', '/api/user/leaderboard-percentile').catch(() => null),
+  /** „Meine Woche teilen“: Text zum Kopieren/Teilen (z. B. „7 Tage Streak, 14 L getrunken“). */
+  getShareText: () => request('GET', '/api/user/share-text'),
+  /** Letzte Erinnerungen (optional ?today=true nur heute). */
+  getReminderHistory: (todayOnly = false) =>
+    request('GET', `/api/user/reminder-history${todayOnly ? '?today=true' : ''}`),
+}
+
+export const push = {
+  getVapidPublicKey: () => request('GET', '/api/push/vapid-public-key'),
 }
 
 export { getToken }

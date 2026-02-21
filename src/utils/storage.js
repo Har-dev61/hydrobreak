@@ -145,6 +145,32 @@ export function setStoredGamification(data) {
   safeSetItem(STORAGE_KEYS.GAMIFICATION, JSON.stringify(trimmed))
 }
 
+/** Täglicher Kontext für AI-Insights: { [dateKey]: { location?, activityLevel? } } */
+function trimDailyContextToMaxDays(data) {
+  if (!data || typeof data !== 'object') return data
+  const cutoff = getCutoffDateKey()
+  const next = {}
+  for (const [dateKey, value] of Object.entries(data)) {
+    if (dateKey >= cutoff) next[dateKey] = value
+  }
+  return next
+}
+
+export function getStoredDailyContext(fallback) {
+  const raw = safeGetItem(STORAGE_KEYS.DAILY_CONTEXT, null)
+  const parsed = safeParse(raw, fallback ?? {})
+  const trimmed = trimDailyContextToMaxDays(parsed)
+  if (Object.keys(trimmed).length < Object.keys(parsed).length) {
+    safeSetItem(STORAGE_KEYS.DAILY_CONTEXT, JSON.stringify(trimmed))
+  }
+  return trimmed
+}
+
+export function setStoredDailyContext(data) {
+  const trimmed = data ? trimDailyContextToMaxDays(data) : data
+  safeSetItem(STORAGE_KEYS.DAILY_CONTEXT, JSON.stringify(trimmed))
+}
+
 export function getStoredOnboardingDone() {
   return safeGetItem(STORAGE_KEYS.ONBOARDING_DONE, '') === 'true'
 }

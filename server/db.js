@@ -148,6 +148,19 @@ export function getData(userId, kind) {
   return raw ?? null
 }
 
+/** Alle User-IDs (für Push-Cron). */
+export function getAllUserIds() {
+  const users = readJson('users', [])
+  return users.map((u) => u.id)
+}
+
+/** User-Provider prüfen (nur E-Mail-User für Push). */
+export function getUserByIdForPush(id) {
+  const users = readJson('users', [])
+  const u = users.find((x) => x.id === id)
+  return u && u.provider === 'email' ? u : null
+}
+
 export function setData(userId, kind, payload) {
   const data = readJson('user_data', {})
   data[`${userId}:${kind}`] = payload

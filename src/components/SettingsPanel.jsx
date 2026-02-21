@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { Settings, Bell, ChevronDown, Clock, User, LogOut, RotateCcw, Download, Briefcase, Timer, Volume2, Smartphone } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Settings, Bell, ChevronDown, Clock, User, LogOut, RotateCcw, Download, Briefcase, Timer, Volume2, Smartphone, Mail, History, Droplets, Move, Eye, MapPin, Activity, BarChart3 } from 'lucide-react'
+import { user as userApi } from '../api/client'
 import {
   WATER_INTERVAL_MIN,
   WATER_INTERVAL_MAX,
@@ -36,6 +37,8 @@ export default function SettingsPanel({
   onReminderWindowChange,
   onReminderWindowStartChange,
   onReminderWindowEndChange,
+  reminderWeekdaysOnly,
+  onReminderWeekdaysOnlyChange,
   focusSessionDurationMinutes,
   onFocusSessionDurationChange,
   onRequestNotificationPermission,
@@ -52,9 +55,39 @@ export default function SettingsPanel({
   onLoginClick,
   onLogout,
   onResetApp,
+  emailDigestEnabled = false,
+  onEmailDigestChange,
+  locationContext = 'unknown',
+  activityLevel = 'medium',
+  weatherForInsights = true,
+  onLocationContextChange,
+  onActivityLevelChange,
+  onWeatherForInsightsChange,
+  sleepHoursLastNight = null,
+  weightKg = null,
+  age = null,
+  sex = 'unknown',
+  lastSportMinutesAgo = null,
+  onSleepHoursChange,
+  onWeightKgChange,
+  onAgeChange,
+  onSexChange,
+  onLastSportMinutesAgoChange,
 }) {
   const [open, setOpen] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [reminderHistoryOpen, setReminderHistoryOpen] = useState(false)
+  const [reminderHistoryTodayOnly, setReminderHistoryTodayOnly] = useState(true)
+  const [reminderHistoryItems, setReminderHistoryItems] = useState([])
+  const [reminderHistoryLoading, setReminderHistoryLoading] = useState(false)
+
+  useEffect(() => {
+    if (!user || !reminderHistoryOpen) return
+    setReminderHistoryLoading(true)
+    userApi.getReminderHistory(reminderHistoryTodayOnly).then((data) => {
+      setReminderHistoryItems(data?.items ?? [])
+    }).catch(() => setReminderHistoryItems([])).finally(() => setReminderHistoryLoading(false))
+  }, [user, reminderHistoryOpen, reminderHistoryTodayOnly])
 
   const handleResetClick = () => {
     if (showResetConfirm) {
@@ -121,6 +154,285 @@ export default function SettingsPanel({
           </div>
           {user && (
             <p className="text-xs text-app-muted-foreground">{t('settings.syncNote')}</p>
+          )}
+          {user && onEmailDigestChange && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-[var(--app-primary)] flex items-center gap-2">
+                <Mail className="w-4 h-4 text-app-muted-foreground" />
+                {t('settings.emailDigest')}
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emailDigestEnabled}
+                  onChange={(e) => onEmailDigestChange(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 rounded-full bg-app-muted peer-checked:bg-blue-500 transition-colors" />
+                <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-gray-200 rounded-full shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
+              </label>
+            </div>
+          )}
+          {user && emailDigestEnabled && (
+            <p className="text-xs text-app-muted-foreground">{t('settings.emailDigestHint')}</p>
+          )}
+          {/* Standort & Aktivität für AI-Insights */}
+          {onLocationContextChange && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[var(--app-primary)] mb-1 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-app-muted-foreground" />
+                  {t('settings.locationContext')}
+                </label>
+                <select
+                  value={locationContext}
+                  onChange={(e) => onLocationContextChange(e.target.value)}
+                  className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                  aria-describedby="location-context-hint"
+                >
+                  <option value="unknown">{t('settings.locationUnknown')}</option>
+                  <option value="home">{t('settings.locationHome')}</option>
+                  <option value="office">{t('settings.locationOffice')}</option>
+                  <option value="other">{t('settings.locationOther')}</option>
+                </select>
+                <p id="location-context-hint" className="text-xs text-app-muted-foreground mt-1">
+                  {t('settings.locationContextHint')}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--app-primary)] mb-1 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-app-muted-foreground" />
+                  {t('settings.activityLevel')}
+                </label>
+                <select
+                  value={activityLevel}
+                  onChange={(e) => onActivityLevelChange(e.target.value)}
+                  className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                  aria-describedby="activity-level-hint"
+                >
+                  <option value="low">{t('settings.activityLow')}</option>
+                  <option value="medium">{t('settings.activityMedium')}</option>
+                  <option value="high">{t('settings.activityHigh')}</option>
+                </select>
+                <p id="activity-level-hint" className="text-xs text-app-muted-foreground mt-1">
+                  {t('settings.activityLevelHint')}
+                </p>
+              </div>
+              {onWeatherForInsightsChange && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-[var(--app-primary)] flex items-center gap-2">
+                    {t('settings.weatherForInsights')}
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={weatherForInsights}
+                      onChange={(e) => onWeatherForInsightsChange(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-6 rounded-full bg-app-muted peer-checked:bg-blue-500 transition-colors" />
+                    <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-gray-200 rounded-full shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
+                  </label>
+                </div>
+              )}
+              {onWeatherForInsightsChange && (
+                <p className="text-xs text-app-muted-foreground">{t('settings.weatherForInsightsHint')}</p>
+              )}
+            </div>
+          )}
+
+          {/* Predictive Health – optionale Nutzerparameter */}
+          {(onSleepHoursChange || onWeightKgChange || onAgeChange || onSexChange || onLastSportMinutesAgoChange) && (
+            <div className="space-y-3 pt-2 border-t border-app-border-subtle">
+              <p className="text-sm font-medium text-[var(--app-primary)] flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-app-muted-foreground" />
+                {t('settings.predictiveHealth')}
+              </p>
+              <p className="text-xs text-app-muted-foreground">{t('settings.predictiveHealthHint')}</p>
+              {onSleepHoursChange && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--app-primary)] mb-1">
+                    {t('settings.sleepHoursLastNight')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={24}
+                    step={0.5}
+                    value={sleepHoursLastNight ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? null : Number(e.target.value)
+                      onSleepHoursChange(v)
+                    }}
+                    placeholder="z. B. 7"
+                    className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                    aria-describedby="sleep-hours-hint"
+                  />
+                  <p id="sleep-hours-hint" className="text-xs text-app-muted-foreground mt-1">
+                    {t('settings.sleepHoursHint')}
+                  </p>
+                </div>
+              )}
+              {onWeightKgChange && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--app-primary)] mb-1">
+                    {t('settings.weightKg')}
+                  </label>
+                  <input
+                    type="number"
+                    min={30}
+                    max={300}
+                    value={weightKg ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? null : Number(e.target.value)
+                      onWeightKgChange(v)
+                    }}
+                    placeholder="z. B. 70"
+                    className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                    aria-describedby="weight-hint"
+                  />
+                  <p id="weight-hint" className="text-xs text-app-muted-foreground mt-1">
+                    {t('settings.weightKgHint')}
+                  </p>
+                </div>
+              )}
+              {onAgeChange && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--app-primary)] mb-1">
+                    {t('settings.age')}
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={120}
+                    value={age ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? null : Number(e.target.value)
+                      onAgeChange(v)
+                    }}
+                    placeholder="z. B. 30"
+                    className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                    aria-describedby="age-hint"
+                  />
+                  <p id="age-hint" className="text-xs text-app-muted-foreground mt-1">
+                    {t('settings.ageHint')}
+                  </p>
+                </div>
+              )}
+              {onSexChange && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--app-primary)] mb-1">
+                    {t('settings.sex')}
+                  </label>
+                  <select
+                    value={sex ?? 'unknown'}
+                    onChange={(e) => onSexChange(e.target.value)}
+                    className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                  >
+                    <option value="unknown">{t('settings.sexUnknown')}</option>
+                    <option value="male">{t('settings.sexMale')}</option>
+                    <option value="female">{t('settings.sexFemale')}</option>
+                  </select>
+                </div>
+              )}
+              {onLastSportMinutesAgoChange && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--app-primary)] mb-1">
+                    {t('settings.lastSportMinutesAgo')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1440}
+                    value={lastSportMinutesAgo ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? null : Number(e.target.value)
+                      onLastSportMinutesAgoChange(v)
+                    }}
+                    placeholder="z. B. 120 (vor 2 h)"
+                    className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-[var(--app-primary)] text-sm"
+                    aria-describedby="last-sport-hint"
+                  />
+                  <p id="last-sport-hint" className="text-xs text-app-muted-foreground mt-1">
+                    {t('settings.lastSportHint')}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-xs text-app-muted-foreground">{t('widget.addToHomeHintDesc')}</p>
+            <a
+              href="/?view=compact"
+              className="text-sm font-medium text-[var(--app-accent)] hover:text-[var(--app-accent-hover)] flex items-center gap-2"
+            >
+              <Smartphone className="w-4 h-4" />
+              {t('widget.addToHomeHint')}
+            </a>
+          </div>
+          {user && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setReminderHistoryOpen((o) => !o)}
+                className="w-full flex items-center justify-between text-left text-sm font-medium text-[var(--app-primary)] gap-2"
+                aria-expanded={reminderHistoryOpen}
+              >
+                <span className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-app-muted-foreground" />
+                  {t('reminderHistory.title')}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-app-muted-foreground transition-transform duration-200 ${reminderHistoryOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {reminderHistoryOpen && (
+                <div className="pl-6 space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReminderHistoryTodayOnly(true)}
+                      className={`text-xs px-2 py-1 rounded-md ${reminderHistoryTodayOnly ? 'bg-[var(--app-accent)] text-white' : 'bg-app-muted text-app-muted-foreground'}`}
+                    >
+                      {t('reminderHistory.todayOnly')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReminderHistoryTodayOnly(false)}
+                      className={`text-xs px-2 py-1 rounded-md ${!reminderHistoryTodayOnly ? 'bg-[var(--app-accent)] text-white' : 'bg-app-muted text-app-muted-foreground'}`}
+                    >
+                      {t('reminderHistory.all')}
+                    </button>
+                  </div>
+                  <div className="text-sm space-y-1.5 max-h-48 overflow-y-auto">
+                    {reminderHistoryLoading && <p className="text-app-muted-foreground">{t('app.loading')}</p>}
+                    {!reminderHistoryLoading && reminderHistoryItems.length === 0 && (
+                      <p className="text-app-muted-foreground">
+                        {reminderHistoryTodayOnly ? t('reminderHistory.emptyToday') : t('reminderHistory.empty')}
+                      </p>
+                    )}
+                    {!reminderHistoryLoading && reminderHistoryItems.map((item, i) => {
+                      const isToday = item.triggeredAt && new Date(item.triggeredAt).toDateString() === new Date().toDateString()
+                      const Icon = item.type === 'water' ? Droplets : item.type === 'stand' ? Move : Eye
+                      const label = item.type === 'water' ? t('reminderHistory.water') : item.type === 'stand' ? t('reminderHistory.stand') : t('reminderHistory.eye')
+                      const timeStr = item.triggeredAt
+                        ? (isToday
+                          ? new Date(item.triggeredAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                          : new Date(item.triggeredAt).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
+                        : '–'
+                      return (
+                        <div key={i} className="flex items-center gap-2 py-1 border-b border-app-border-subtle last:border-0">
+                          <Icon className="w-4 h-4 shrink-0 text-app-muted-foreground" aria-hidden />
+                          <span className="text-[var(--app-primary)]">{label}</span>
+                          <span className="text-app-muted-foreground text-xs ml-auto">{timeStr}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Wasser-Intervall */}
@@ -284,6 +596,27 @@ export default function SettingsPanel({
             <p className="text-xs text-app-muted-foreground">
               {t('settings.reminderWindowHint')}
             </p>
+            <div className="pt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[var(--app-primary)]">
+                  {t('settings.reminderWeekdaysOnly')}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reminderWeekdaysOnly ?? false}
+                    onChange={(e) => onReminderWeekdaysOnlyChange?.(e.target.checked)}
+                    className="sr-only peer"
+                    aria-describedby="reminder-weekdays-hint"
+                  />
+                  <div className="w-10 h-6 rounded-full bg-app-muted peer-checked:bg-blue-500 transition-colors" />
+                  <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-gray-200 rounded-full shadow-sm transition-transform duration-200 peer-checked:translate-x-4" />
+                </label>
+              </div>
+              <p id="reminder-weekdays-hint" className="text-xs text-app-muted-foreground">
+                {t('settings.reminderWeekdaysOnlyHint')}
+              </p>
+            </div>
           </div>
 
           {/* Benachrichtigungen */}

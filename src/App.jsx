@@ -27,6 +27,8 @@ import {
   setStoredTheme,
   getStoredGamification,
   setStoredGamification,
+  getStoredDailyContext,
+  setStoredDailyContext,
   getStoredOnboardingDone,
   setStoredOnboardingDone,
   setStorageErrorCallback,
@@ -34,6 +36,7 @@ import {
   getStoredLastSeenVersion,
   setStoredLastSeenVersion,
 } from './utils/storage'
+import { fetchWeatherWithGeolocation } from './utils/weather'
 import { requestNotificationPermission, showNotification } from './utils/notifications'
 import { playReminderSound } from './utils/sound'
 import { triggerHaptic } from './utils/haptic'
@@ -59,8 +62,18 @@ import {
 } from './constants'
 import { t, tArray, tObject, getDailyQuote, getMotivationalMessages, setLocale } from './i18n'
 import QuickActions from './components/QuickActions'
+import CompactView from './components/CompactView'
+import VoiceCommandButton from './components/VoiceCommandButton'
+import IntroAnimation from './components/IntroAnimation'
+import TodayTab from './components/TodayTab'
 import FocusSessionCard from './components/FocusSessionCard'
+import { ReminderTimersProvider } from './context/ReminderTimersContext'
+import { useVoiceCommands } from './hooks/useVoiceCommands'
 import StatsModal from './components/StatsModal'
+import StatsPage from './components/StatsPage'
+import LeaderboardCard from './components/LeaderboardCard'
+import BottomNav from './components/BottomNav'
+import PullToRefresh from './components/PullToRefresh'
 import LegalModal from './components/LegalModal'
 import WhatsNewModal from './components/WhatsNewModal'
 import AppFooter from './components/AppFooter'
@@ -79,10 +92,21 @@ const defaultSettings = {
   reminderWindowEnabled: false,
   reminderWindowStart: '08:00',
   reminderWindowEnd: '18:00',
+  reminderWeekdaysOnly: false,
   focusSessionDurationMinutes: FOCUS_SESSION_DURATION_DEFAULT,
   reminderSoundEnabled: false,
   hapticEnabled: true,
   locale: 'de',
+  emailDigestEnabled: false,
+  locationContext: 'unknown',
+  activityLevel: 'medium',
+  weatherForInsights: true,
+  // Predictive Health (optional)
+  sleepHoursLastNight: null,
+  weightKg: null,
+  age: null,
+  sex: 'unknown',
+  lastSportMinutesAgo: null,
 }
 
 /** Prüft, ob die aktuelle Uhrzeit in der Fokuszeit liegt (keine Erinnerungen). */
@@ -147,10 +171,17 @@ function StorageErrorBanner({ message, onDismiss }) {
 }
 
 export default function App() {
-  const [settings, setSettings] = useState(() => ({
-    ...defaultSettings,
-    ...getStoredSettings(null),
-  }))
+  const [settings, setSettings] = useState(() => {
+    const stored = getStoredSettings(null)
+    return {
+      ...defaultSettings,
+      ...stored,
+      timezone:
+        typeof Intl !== 'undefined' && Intl.DateTimeFormat?.().resolvedOptions?.().timeZone
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : 'UTC',
+    }
+  })
   const [progress, setProgress] = useState(() => {
     const stored = getStoredProgress(getDefaultProgress())
     const today = getTodayKey()
@@ -163,9 +194,6 @@ export default function App() {
   })
   const [stats, setStats] = useState(() => getStoredStats(getDefaultStats()))
   const [theme, setThemeState] = useState(getStoredTheme)
-  const [waterRemaining, setWaterRemaining] = useState(settings.waterIntervalMinutes * 60)
-  const [standRemaining, setStandRemaining] = useState(settings.standUpIntervalMinutes * 60)
-  const [eyeRemaining, setEyeRemaining] = useState(settings.eyeBreakIntervalMinutes * 60)
   const [waterMessage, setWaterMessage] = useState('')
   const [standMessage, setStandMessage] = useState('')
   const [eyeMessage, setEyeMessage] = useState('')
@@ -187,7 +215,20 @@ export default function App() {
   const [legalModalOpen, setLegalModalOpen] = useState(false)
   const [legalType, setLegalType] = useState('privacy')
   const [whatsNewOpen, setWhatsNewOpen] = useState(false)
-  const tickRef = useRef(null)
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === 'undefined') return 'today'
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    return tab === 'stats' ? 'stats' : tab === 'settings' ? 'settings' : 'today'
+  })
+  const [isCompactView, setCompactView] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'compact'
+  )
+  const [introVisible, setIntroVisible] = useState(true)
+  const [leaderboardPercentile, setLeaderboardPercentile] = useState(null)
+  const [shareFeedback, setShareFeedback] = useState(false)
+  const [dailyContext, setDailyContextState] = useState(() => getStoredDailyContext({}))
+  const [weather, setWeather] = useState(null)
+  const timerApiRef = useRef(null)
   const hasCheckedComebackRef = useRef(false)
   const hasCheckedWhatsNewRef = useRef(false)
   const lastDateRef = useRef(getTodayKey())
@@ -208,10 +249,20 @@ export default function App() {
     reminderWindowEnabled,
     reminderWindowStart,
     reminderWindowEnd,
+    reminderWeekdaysOnly = false,
     focusSessionDurationMinutes = 25,
     reminderSoundEnabled = false,
     hapticEnabled = true,
     locale = 'de',
+    emailDigestEnabled = false,
+    locationContext = 'unknown',
+    activityLevel = 'medium',
+    weatherForInsights = true,
+    sleepHoursLastNight = null,
+    weightKg = null,
+    age = null,
+    sex = 'unknown',
+    lastSportMinutesAgo = null,
   } = settings
 
   const persistSettings = useCallback(
@@ -292,6 +343,25 @@ export default function App() {
     })
   }, [token, authLoading])
 
+  // Rangliste / Top-X% (anonymisiert). Backend liefert z. B. { percentile: 20 }.
+  useEffect(() => {
+    if (!token) return
+    userApi.getLeaderboardPercentile().then((data) => {
+      if (data && typeof data.percentile === 'number') setLeaderboardPercentile(data.percentile)
+    }).catch(() => {})
+  }, [token])
+
+  const handleShareWeek = useCallback(() => {
+    if (!token) return
+    userApi.getShareText()
+      .then(({ text }) => navigator.clipboard.writeText(text))
+      .then(() => {
+        setShareFeedback(true)
+        setTimeout(() => setShareFeedback(false), 2000)
+      })
+      .catch(() => {})
+  }, [token])
+
   useEffect(() => {
     if (!token) hasLoadedFromApiRef.current = false
   }, [token])
@@ -304,6 +374,30 @@ export default function App() {
   useEffect(() => {
     setLocale(locale)
   }, [locale])
+
+  // Heutigen Standort-/Aktivitäts-Kontext in dailyContext schreiben (für AI-Muster)
+  useEffect(() => {
+    const today = getTodayKey()
+    setDailyContextState((prev) => {
+      const next = { ...prev, [today]: { location: locationContext, activityLevel } }
+      setStoredDailyContext(next)
+      return next
+    })
+  }, [locationContext, activityLevel])
+
+  // Wetter optional für AI-Insights (nur bei Zustimmung)
+  useEffect(() => {
+    if (!weatherForInsights) return
+    fetchWeatherWithGeolocation().then(setWeather)
+  }, [weatherForInsights])
+
+  // Web Push: Abo beim Backend registrieren, wenn eingeloggt und Benachrichtigungen an
+  useEffect(() => {
+    if (!token || !notificationsEnabled) return
+    import('./utils/pushSubscription.js').then(({ subscribeAndSendToBackend }) => {
+      subscribeAndSendToBackend().catch(() => {})
+    })
+  }, [token, notificationsEnabled])
 
   // „Was ist neu?“ einmalig anzeigen, wenn Nutzer auf neuere Version trifft
   useEffect(() => {
@@ -400,13 +494,6 @@ export default function App() {
     [verifyEmail]
   )
 
-  // Bei geänderten Intervallen Countdowns zurücksetzen
-  useEffect(() => {
-    setWaterRemaining(waterIntervalMinutes * 60)
-    setStandRemaining(standUpIntervalMinutes * 60)
-    setEyeRemaining(eyeBreakIntervalMinutes * 60)
-  }, [waterIntervalMinutes, standUpIntervalMinutes, eyeBreakIntervalMinutes])
-
   useEffect(() => {
     const dark =
       theme === 'dark' ||
@@ -440,72 +527,33 @@ export default function App() {
     }
   }, [progress.todayMl, progress.date])
 
-  useEffect(() => {
-    tickRef.current = setInterval(() => {
-      const inFocus = isInFocusTime(focusModeEnabled, focusStart, focusEnd)
-      const outsideWindow = isOutsideReminderWindow(
-        reminderWindowEnabled,
-        reminderWindowStart,
-        reminderWindowEnd
-      )
-      if (inFocus || outsideWindow) return
+  const onWaterFire = useCallback(() => {
+    if (token) userApi.postReminderSent('water').catch(() => {})
+    setWaterMessage(pickRandom(getMotivationalMessages('water', { dailyStreak: gamification?.dailyStreak ?? 0 })))
+    if (reminderSoundEnabled) playReminderSound()
+    if (notificationsEnabled) {
+      showNotification(t('notifications.waterTitle'), { body: t('notifications.waterBody') })
+    }
+  }, [token, gamification?.dailyStreak, reminderSoundEnabled, notificationsEnabled])
 
-      setWaterRemaining((s) => {
-        if (s <= 1) {
-          setWaterMessage(pickRandom(getMotivationalMessages('water', { dailyStreak: gamification?.dailyStreak ?? 0 })))
-          if (reminderSoundEnabled) playReminderSound()
-          if (notificationsEnabled) {
-            showNotification(t('notifications.waterTitle'), {
-              body: t('notifications.waterBody'),
-            })
-          }
-          return waterIntervalMinutes * 60
-        }
-        return s - 1
-      })
-      setStandRemaining((s) => {
-        if (s <= 1) {
-          setStandMessage(pickRandom(getMotivationalMessages('stand', { dailyStreak: gamification?.dailyStreak ?? 0 })))
-          if (reminderSoundEnabled) playReminderSound()
-          if (notificationsEnabled) {
-            showNotification(t('notifications.standTitle'), {
-              body: t('notifications.standBody'),
-            })
-          }
-          return standUpIntervalMinutes * 60
-        }
-        return s - 1
-      })
-      setEyeRemaining((s) => {
-        if (s <= 1) {
-          setEyeMessage(pickRandom(getMotivationalMessages('eye', { dailyStreak: gamification?.dailyStreak ?? 0 })))
-          if (reminderSoundEnabled) playReminderSound()
-          if (notificationsEnabled) {
-            showNotification(t('notifications.eyeTitle'), {
-              body: t('notifications.eyeBody'),
-            })
-          }
-          setEyeModalOpen(true)
-          return eyeBreakIntervalMinutes * 60
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(tickRef.current)
-  }, [
-    waterIntervalMinutes,
-    standUpIntervalMinutes,
-    eyeBreakIntervalMinutes,
-    notificationsEnabled,
-    reminderSoundEnabled,
-    focusModeEnabled,
-    focusStart,
-    focusEnd,
-    reminderWindowEnabled,
-    reminderWindowStart,
-    reminderWindowEnd,
-    gamification?.dailyStreak,
-  ])
+  const onStandFire = useCallback(() => {
+    if (token) userApi.postReminderSent('stand').catch(() => {})
+    setStandMessage(pickRandom(getMotivationalMessages('stand', { dailyStreak: gamification?.dailyStreak ?? 0 })))
+    if (reminderSoundEnabled) playReminderSound()
+    if (notificationsEnabled) {
+      showNotification(t('notifications.standTitle'), { body: t('notifications.standBody') })
+    }
+  }, [token, gamification?.dailyStreak, reminderSoundEnabled, notificationsEnabled])
+
+  const onEyeFire = useCallback(() => {
+    if (token) userApi.postReminderSent('eye').catch(() => {})
+    setEyeMessage(pickRandom(getMotivationalMessages('eye', { dailyStreak: gamification?.dailyStreak ?? 0 })))
+    if (reminderSoundEnabled) playReminderSound()
+    if (notificationsEnabled) {
+      showNotification(t('notifications.eyeTitle'), { body: t('notifications.eyeBody') })
+    }
+    setEyeModalOpen(true)
+  }, [token, gamification?.dailyStreak, reminderSoundEnabled, notificationsEnabled])
 
   const handleDrinkNow = useCallback(() => {
     if (hapticEnabled) triggerHaptic(50)
@@ -516,7 +564,7 @@ export default function App() {
     }
     setProgress(progressAfter)
     setStoredProgress(progressAfter)
-    setWaterRemaining(waterIntervalMinutes * 60)
+    timerApiRef.current?.resetWater?.()
     setWaterMessage('')
 
     const result = applyAction(gamification, progress, today, 'water', progressAfter, {
@@ -539,7 +587,7 @@ export default function App() {
   const handleStartBreak = useCallback(() => {
     if (hapticEnabled) triggerHaptic(50)
     const today = getTodayKey()
-    setStandRemaining(standUpIntervalMinutes * 60)
+    timerApiRef.current?.resetStand?.()
     setStandMessage('')
 
     const result = applyAction(gamification, progress, today, 'stand', null, { waterGoalMl })
@@ -559,16 +607,58 @@ export default function App() {
 
   const handleStartEyeBreak = useCallback(() => {
     setEyeModalOpen(true)
-    setEyeRemaining(eyeBreakIntervalMinutes * 60)
+    timerApiRef.current?.resetEye?.()
     setEyeMessage('')
     setQuickActionFeedback({ type: 'eye', xp: 0 })
     setTimeout(() => setQuickActionFeedback(null), 1600)
   }, [eyeBreakIntervalMinutes])
 
+  const actionHandledRef = useRef(false)
+  useEffect(() => {
+    if (actionHandledRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    const action = params.get('action')
+    if (!action) return
+    actionHandledRef.current = true
+    if (action === 'drink') handleDrinkNow()
+    else if (action === 'stand') handleStartBreak()
+    else if (action === 'eye') handleStartEyeBreak()
+    window.history.replaceState({}, '', window.location.pathname || '/')
+  }, [handleDrinkNow, handleStartBreak, handleStartEyeBreak])
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const target = e.target
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
+      const key = e.key?.toLowerCase()
+      if (key === '1' || key === 'd') {
+        handleDrinkNow()
+        e.preventDefault()
+      } else if (key === '2' || key === 's') {
+        handleStartBreak()
+        e.preventDefault()
+      } else if (key === '3' || key === 'e') {
+        handleStartEyeBreak()
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleDrinkNow, handleStartBreak, handleStartEyeBreak])
+
+  const voice = useVoiceCommands(
+    {
+      onDrink: handleDrinkNow,
+      onStand: handleStartBreak,
+      onEye: handleStartEyeBreak,
+    },
+    { lang: locale?.startsWith('de') ? 'de-DE' : 'en-US' }
+  )
+
   const handleEyeBreakComplete = useCallback(() => {
     if (hapticEnabled) triggerHaptic(50)
     const today = getTodayKey()
-    setEyeRemaining(eyeBreakIntervalMinutes * 60)
+    timerApiRef.current?.resetEye?.()
 
     const result = applyAction(gamification, progress, today, 'eye', null, { waterGoalMl })
     persistGamification(result.gamification)
@@ -586,15 +676,15 @@ export default function App() {
   }, [eyeBreakIntervalMinutes, progress, gamification, persistGamification, waterGoalMl, hapticEnabled])
 
   const handleSnoozeWater = useCallback(() => {
-    setWaterRemaining(SNOOZE_MINUTES * 60)
+    timerApiRef.current?.setWaterRemaining?.(SNOOZE_MINUTES * 60)
     setWaterMessage('')
   }, [])
   const handleSnoozeStand = useCallback(() => {
-    setStandRemaining(SNOOZE_MINUTES * 60)
+    timerApiRef.current?.setStandRemaining?.(SNOOZE_MINUTES * 60)
     setStandMessage('')
   }, [])
   const handleSnoozeEye = useCallback(() => {
-    setEyeRemaining(SNOOZE_MINUTES * 60)
+    timerApiRef.current?.setEyeRemaining?.(SNOOZE_MINUTES * 60)
     setEyeMessage('')
   }, [])
 
@@ -611,8 +701,50 @@ export default function App() {
 
   const handleRequestNotificationPermission = useCallback(async () => {
     const ok = await requestNotificationPermission()
-    if (ok) persistSettings((s) => ({ ...s, notificationsEnabled: true }))
+    if (ok) {
+      persistSettings((s) => ({ ...s, notificationsEnabled: true }))
+      const { subscribeAndSendToBackend } = await import('./utils/pushSubscription.js')
+      subscribeAndSendToBackend().catch(() => {})
+    }
   }, [persistSettings])
+
+  const handleRefresh = useCallback(async () => {
+    if (token) {
+      const [apiSettings, apiProgress, apiStats, apiGamification] = await Promise.all([
+        userApi.getSettings().catch(() => null),
+        userApi.getProgress().catch(() => null),
+        userApi.getStats().catch(() => null),
+        userApi.getGamification().catch(() => null),
+      ])
+      if (apiSettings && Object.keys(apiSettings).length > 0) {
+        setSettings((prev) => ({ ...defaultSettings, ...prev, ...apiSettings }))
+        setStoredSettings({ ...defaultSettings, ...apiSettings })
+      }
+      if (apiProgress?.date === getTodayKey()) {
+        setProgress(apiProgress)
+        setStoredProgress(apiProgress)
+      }
+      if (apiStats && (apiStats.daily?.length > 0 || apiStats.weeklyTotal != null)) {
+        setStats((prev) => ({ ...getDefaultStats(), ...prev, ...apiStats }))
+        setStoredStats({ ...getDefaultStats(), ...apiStats })
+      }
+      if (apiGamification && Object.keys(apiGamification).length > 0) {
+        const today = getTodayKey()
+        setGamificationState((prev) =>
+          ensureGamificationState({ ...prev, ...apiGamification }, today)
+        )
+        setStoredGamification(ensureGamificationState({ ...apiGamification }, today))
+      }
+    }
+    timerApiRef.current?.setWaterRemaining?.(waterIntervalMinutes * 60)
+    timerApiRef.current?.setStandRemaining?.(standUpIntervalMinutes * 60)
+    timerApiRef.current?.setEyeRemaining?.(eyeBreakIntervalMinutes * 60)
+  }, [
+    token,
+    waterIntervalMinutes,
+    standUpIntervalMinutes,
+    eyeBreakIntervalMinutes,
+  ])
 
   const handleOnboardingComplete = useCallback(
     ({ waterGoalMl: goalMl, notificationsAllowed }) => {
@@ -715,8 +847,45 @@ export default function App() {
     )
   }
 
+  if (isCompactView) {
+    return (
+      <div className="min-h-screen bg-app-bg transition-colors">
+        {storageErrorMessage && (
+          <StorageErrorBanner
+            message={storageErrorMessage}
+            onDismiss={() => setStorageErrorMessage(null)}
+          />
+        )}
+        {!online && <OfflineBanner />}
+        <CompactView
+          todayMl={progress.todayMl}
+          waterGoalMl={waterGoalMl}
+          onDrink={handleDrinkNow}
+          onStand={handleStartBreak}
+          onEye={handleStartEyeBreak}
+          feedback={quickActionFeedback}
+          onOpenFullApp={() => {
+            window.history.replaceState({}, '', '/')
+            setCompactView(false)
+          }}
+          voice={voice}
+        />
+        <Suspense fallback={null}>
+          <EyeBreakModal
+            open={eyeModalOpen}
+            onClose={() => setEyeModalOpen(false)}
+            onComplete={handleEyeBreakComplete}
+          />
+        </Suspense>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-app-bg transition-colors">
+    <div className="min-h-screen bg-app-bg transition-colors flex flex-col">
+      {introVisible && (
+        <IntroAnimation onComplete={() => setIntroVisible(false)} />
+      )}
       {storageErrorMessage && (
         <StorageErrorBanner
           message={storageErrorMessage}
@@ -724,7 +893,7 @@ export default function App() {
         />
       )}
       {!online && <OfflineBanner />}
-      <div className="max-w-xl mx-auto px-5 py-10 pb-20 sm:px-6">
+      <div className="max-w-xl mx-auto w-full flex-1 flex flex-col px-5 pt-5 pb-2 min-h-0 sm:px-6">
         {showComebackBanner && (
           <ComebackBanner
             show={showComebackBanner}
@@ -732,147 +901,116 @@ export default function App() {
             onDismiss={() => setShowComebackBanner(false)}
           />
         )}
-        <header className="mb-8 text-center animate-fade-in" role="banner">
-          {isInFocusTime(focusModeEnabled, focusStart, focusEnd) && (
-            <div
-              className="mb-4 inline-flex items-center gap-2 rounded-button bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 px-3 py-2 text-amber-800 dark:text-amber-200 text-sm font-medium"
-              role="status"
-              aria-live="polite"
-              aria-label={t('app.focusTimeBanner')}
-            >
-              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden />
-              {t('app.focusTimeBanner')}
-            </div>
-          )}
-          {reminderWindowEnabled &&
-            isOutsideReminderWindow(reminderWindowEnabled, reminderWindowStart, reminderWindowEnd) && (
-              <div
-                className="mb-4 inline-flex items-center gap-2 rounded-button bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20 px-3 py-2 text-blue-800 dark:text-blue-200 text-sm font-medium"
-                role="status"
-                aria-live="polite"
-                aria-label={t('app.reminderWindowBanner')}
-              >
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" aria-hidden />
-                {t('app.reminderWindowBanner')}
-              </div>
-            )}
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--app-primary)]" id="app-title">
-            {t('app.title')}
-          </h1>
-          <p className="mt-1 text-sm text-app-muted-foreground">{t('app.subtitle')}</p>
-          {(user?.name || user?.email) && (
-            <p className="mt-2 text-sm text-app-muted-foreground" aria-live="polite">
-              {user?.name
-                ? t('app.greeting', { name: user.name })
-                : t('app.greeting', { name: user.email?.split('@')[0] || 'Du' })}
-            </p>
-          )}
-          {!(user?.name || user?.email) && getDailyQuote() && (
-            <p className="mt-2 text-sm text-app-muted-foreground italic" aria-live="polite">
-              {getDailyQuote()}
-            </p>
-          )}
-        </header>
 
-        <main id="main-content" className="space-y-5" role="main" tabIndex={-1}>
-          {/* Fokus-Reihenfolge: Quick Actions → Karten → Einstellungen */}
-          <ErrorBoundary retryable>
-            <QuickActions
-              onDrink={handleDrinkNow}
-              onStand={handleStartBreak}
-              onEye={handleStartEyeBreak}
-              feedback={quickActionFeedback}
+        {activeTab === 'today' && (
+          <ReminderTimersProvider
+            config={{
+              waterIntervalMinutes,
+              standUpIntervalMinutes,
+              eyeBreakIntervalMinutes,
+              focusModeEnabled,
+              focusStart,
+              focusEnd,
+              reminderWindowEnabled,
+              reminderWindowStart,
+              reminderWindowEnd,
+              reminderWeekdaysOnly,
+            }}
+            onWaterFire={onWaterFire}
+            onStandFire={onStandFire}
+            onEyeFire={onEyeFire}
+            timerApiRef={timerApiRef}
+          >
+            <TodayTab
+              todayProps={{
+                user,
+                voice,
+                focusModeEnabled,
+                focusStart,
+                focusEnd,
+                reminderWindowEnabled,
+                reminderWindowStart,
+                reminderWindowEnd,
+                reminderWeekdaysOnly,
+                waterIntervalMinutes,
+                standUpIntervalMinutes,
+                eyeBreakIntervalMinutes,
+                waterMessage,
+                standMessage,
+                eyeMessage,
+                gamification,
+                weeklySummaries,
+                leaderboardPercentile,
+                waterGoalMl,
+                todayActivity,
+                heatmapData,
+                milestonesForDisplay,
+                progress,
+                showStats,
+                dailyHistory,
+                weeklyTotal,
+                focusSessionDurationMinutes,
+                APP_VERSION,
+                handleDrinkNow,
+                handleStartBreak,
+                handleStartEyeBreak,
+                handleSnoozeWater,
+                handleSnoozeStand,
+                handleSnoozeEye,
+                handleClaimChallenge,
+                handleToggleStats,
+                setStatsModalOpen,
+                handleRefresh,
+                handleOpenLegal,
+                handleShareWeek,
+                quickActionFeedback,
+                dailyContext,
+                weather,
+                stats,
+                settings,
+                todayKey,
+              }}
             />
-          </ErrorBoundary>
-          <ErrorBoundary retryable>
-            <FocusSessionCard
-              durationMinutes={focusSessionDurationMinutes}
-              onStartEyeBreak={handleStartEyeBreak}
-              onStartStandBreak={handleStartBreak}
-            />
-          </ErrorBoundary>
-          <ErrorBoundary retryable>
-            <WeekSummaryCard
-              thisWeek={weeklySummaries.thisWeek}
-              prevWeek={weeklySummaries.prevWeek}
-              dailyStreak={gamification.dailyStreak ?? 0}
-            />
-          </ErrorBoundary>
-          <ErrorBoundary retryable>
-            <GamificationPanel
-              gamification={gamification}
-              progress={progress}
-              waterGoalMl={waterGoalMl}
-              todayActivity={todayActivity}
-              onClaimChallenge={handleClaimChallenge}
-              heatmapData={heatmapData}
-              milestonesForDisplay={milestonesForDisplay}
-            />
-          </ErrorBoundary>
+          </ReminderTimersProvider>
+        )}
 
-          <ErrorBoundary retryable>
-            <ProgressTracker
+        {activeTab === 'stats' && (
+          <h2 className="text-lg font-semibold text-[var(--app-primary)] px-1 pb-2 shrink-0">
+            {t('nav.stats')}
+          </h2>
+        )}
+        {activeTab === 'settings' && (
+          <h2 className="text-lg font-semibold text-[var(--app-primary)] px-1 pb-2 shrink-0">
+            {t('nav.settings')}
+          </h2>
+        )}
+
+        {activeTab === 'stats' && (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-20">
+            <StatsPage
+              dailyHistory={dailyHistory}
+              todayKey={todayKey}
               todayMl={progress.todayMl}
               waterGoalMl={waterGoalMl}
-              showStats={showStats}
-              dailyHistory={dailyHistory}
-              weeklyTotal={weeklyTotal}
-              onToggleStats={handleToggleStats}
-              onOpenStatsModal={() => setStatsModalOpen(true)}
+              thisWeek={weeklySummaries?.thisWeek}
+              prevWeek={weeklySummaries?.prevWeek}
+              stats={stats}
+              gamification={gamification}
+              progress={progress}
             />
+          </div>
+        )}
 
-            <ReminderCard
-              type="water"
-              title={t('reminder.waterTitle')}
-              subtitle={t('reminder.waterSubtitle', { minutes: waterIntervalMinutes })}
-              nextIn={formatCountdown(waterRemaining)}
-              nextInSeconds={waterRemaining}
-              totalSeconds={waterIntervalMinutes * 60}
-              message={waterMessage}
-              primaryLabel={t('reminder.drinkNow')}
-              onPrimary={handleDrinkNow}
-              onSnooze={handleSnoozeWater}
-              snoozeLabel={t('reminder.snoozeIn', { minutes: SNOOZE_MINUTES })}
-            />
-
-            <ReminderCard
-              type="stand"
-              title={t('reminder.standTitle')}
-              subtitle={t('reminder.standSubtitle', { minutes: standUpIntervalMinutes })}
-              nextIn={formatCountdown(standRemaining)}
-              nextInSeconds={standRemaining}
-              totalSeconds={standUpIntervalMinutes * 60}
-              message={standMessage}
-              primaryLabel={t('reminder.startBreak')}
-              onPrimary={handleStartBreak}
-              onSnooze={handleSnoozeStand}
-              snoozeLabel={t('reminder.snoozeIn', { minutes: SNOOZE_MINUTES })}
-            />
-
-            <ReminderCard
-              type="eye"
-              title={t('reminder.eyeTitle')}
-              subtitle={t('reminder.eyeSubtitle')}
-              nextIn={formatCountdown(eyeRemaining)}
-              nextInSeconds={eyeRemaining}
-              totalSeconds={eyeBreakIntervalMinutes * 60}
-              message={eyeMessage}
-              primaryLabel={t('reminder.startBreak')}
-              onPrimary={handleStartEyeBreak}
-              onSnooze={handleSnoozeEye}
-              snoozeLabel={t('reminder.snoozeIn', { minutes: SNOOZE_MINUTES })}
-            />
-          </ErrorBoundary>
-
-          <ErrorBoundary retryable>
-            <Suspense
-              fallback={
-                <div
-                  className="h-48 rounded-2xl bg-gray-100 dark:bg-zinc-800 animate-pulse motion-reduce:animate-none"
-                  aria-hidden
-                />
-              }
-            >
+        {activeTab === 'settings' && (
+          <div className="flex-1 min-h-0 overflow-y-auto pb-20">
+          <Suspense
+            fallback={
+              <div
+                className="h-48 rounded-2xl bg-gray-100 dark:bg-zinc-800 animate-pulse motion-reduce:animate-none"
+                aria-hidden
+              />
+            }
+          >
               <SettingsPanel
               waterIntervalMinutes={waterIntervalMinutes}
               standUpIntervalMinutes={standUpIntervalMinutes}
@@ -908,6 +1046,10 @@ export default function App() {
               onReminderWindowEndChange={(v) =>
                 persistSettings((s) => ({ ...s, reminderWindowEnd: v }))
               }
+              reminderWeekdaysOnly={reminderWeekdaysOnly}
+              onReminderWeekdaysOnlyChange={(v) =>
+                persistSettings((s) => ({ ...s, reminderWeekdaysOnly: v }))
+              }
               focusSessionDurationMinutes={focusSessionDurationMinutes}
               onFocusSessionDurationChange={(v) =>
                 persistSettings((s) => ({ ...s, focusSessionDurationMinutes: v }))
@@ -930,13 +1072,41 @@ export default function App() {
               onLoginClick={() => setAuthModalOpen(true)}
               onLogout={logout}
               onResetApp={handleResetApp}
+              emailDigestEnabled={emailDigestEnabled}
+              onEmailDigestChange={(v) =>
+                persistSettings((s) => ({ ...s, emailDigestEnabled: v }))
+              }
+              locationContext={locationContext}
+              activityLevel={activityLevel}
+              weatherForInsights={weatherForInsights}
+              onLocationContextChange={(v) =>
+                persistSettings((s) => ({ ...s, locationContext: v }))
+              }
+              onActivityLevelChange={(v) =>
+                persistSettings((s) => ({ ...s, activityLevel: v }))
+              }
+              onWeatherForInsightsChange={(v) =>
+                persistSettings((s) => ({ ...s, weatherForInsights: v }))
+              }
+              sleepHoursLastNight={sleepHoursLastNight}
+              weightKg={weightKg}
+              age={age}
+              sex={sex}
+              lastSportMinutesAgo={lastSportMinutesAgo}
+              onSleepHoursChange={(v) => persistSettings((s) => ({ ...s, sleepHoursLastNight: v }))}
+              onWeightKgChange={(v) => persistSettings((s) => ({ ...s, weightKg: v }))}
+              onAgeChange={(v) => persistSettings((s) => ({ ...s, age: v }))}
+              onSexChange={(v) => persistSettings((s) => ({ ...s, sex: v }))}
+              onLastSportMinutesAgoChange={(v) => persistSettings((s) => ({ ...s, lastSportMinutesAgo: v }))}
             />
             </Suspense>
-          </ErrorBoundary>
+            <AppFooter onOpenLegal={handleOpenLegal} version={APP_VERSION} />
+          </div>
+        )}
 
-          <AppFooter onOpenLegal={handleOpenLegal} version={APP_VERSION} />
-        </main>
       </div>
+
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       <LegalModal
         open={legalModalOpen}
@@ -989,6 +1159,16 @@ export default function App() {
         value={toast.value}
         badgeName={toast.badgeName}
       />
+
+      {shareFeedback && (
+        <div
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[99] px-4 py-2 rounded-card bg-app-surface border border-app-border shadow-modal dark:shadow-modal-dark text-sm text-[var(--app-primary)]"
+          role="status"
+          aria-live="polite"
+        >
+          {t('share.copied')}
+        </div>
+      )}
 
     </div>
   )

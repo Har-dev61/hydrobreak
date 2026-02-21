@@ -1,69 +1,76 @@
 # HydroBreak
 
-Moderne, minimalistische Web-App (Notion/Linear/Headspace-inspiriert) für gesündere Gewohnheiten am Arbeitsplatz: **Wasser trinken**, **Aufstehen** und **20-20-20 Augenpause** – mit Web Notifications, LocalStorage und optionalem Dark Mode.
+Modern, minimalist web app (Notion/Linear/Headspace-inspired) for healthier habits at work: **drink water**, **stand up**, and **20-20-20 eye breaks** — with web notifications, LocalStorage, and optional dark mode.
 
 ## Features
 
-- **Wasser-Erinnerung**: Standard alle 45 Min (einstellbar 15–120 Min), Tagesfortschritt bis 2 Liter
-- **Aufstehen-Erinnerung**: Standard nach 60 Min Sitzen
-- **20-20-20 Regel**: Erinnerung mit 20-Sekunden-Countdown-Animation
-- **Browser-Benachrichtigungen** (Web Notifications API)
-- **Einstellungen & Fortschritt** in LocalStorage
-- **Dark Mode**: Hell / Dunkel / System
-- **Motivierende Nachrichten** und Aktionen „Jetzt trinken“, „Pause starten“
-- **Tages- und Wochenstatistik** (optional umschaltbar)
-- **Gamification**: XP & Level, Badges, Tages-/Wochen-Streaks, tägliche Challenges, Belohnungs-Animationen
-- **PWA**: Installierbar („Zum Startbildschirm hinzufügen“), Offline-Nutzung nach erstem Besuch, automatische Updates
-- **Backend (optional)**: Anmelden/Registrieren, Sync von Einstellungen, Fortschritt, Stats und Gamification über alle Geräte
+- **Water reminder**: Default every 45 min (configurable 15–120 min), daily progress toward 2 L goal
+- **Stand-up reminder**: Default after 60 min of sitting
+- **20-20-20 rule**: Reminder with 20-second countdown animation
+- **Browser notifications** (Web Notifications API)
+- **Settings & progress** stored in LocalStorage
+- **Dark mode**: Light / Dark / System
+- **Motivational messages** and actions: “Drink now”, “Start break”
+- **Daily and weekly stats** (toggleable)
+- **Gamification**: XP & levels, badges, daily/weekly streaks, daily challenges, reward animations
+- **PWA**: Installable (“Add to home screen”), offline after first visit, automatic updates
+- **Backend (optional)**: Sign in / Register, sync of settings, progress, stats, and gamification across devices
+- **Hydration insights**: Pattern detection, goal forecast, and recommendations from history, location, activity, and weather
+- **Predictive Health**: Real-time scores for dehydration risk, performance impact, fatigue, headache probability, and recovery (from hydration, activity, sleep, weather, and optional user parameters)
 
-## Tech-Stack
+## Tech Stack
 
 - **React 18** (Hooks)
 - **Vite**
 - **TailwindCSS**
 - **Lucide React** (Icons)
 
-## Projektstruktur
+## Project structure
 
 ```
 hydrobreak/
 ├── public/
 │   ├── favicon.svg
-│   ├── icon-512.svg       # PWA-Icon (512×512)
+│   ├── icon-512.svg       # PWA icon (512×512)
 │   └── sw.js              # Service Worker (injectManifest)
 ├── src/
 │   ├── components/
-│   │   ├── ReminderCard.jsx   # Karte pro Erinnerungstyp
-│   │   ├── SettingsPanel.jsx  # Einstellungen (Intervalle, Notifications, Dark Mode)
-│   │   ├── ProgressTracker.jsx # Wasser-Fortschritt & Statistik
-│   │   ├── EyeBreakModal.jsx  # 20-20-20 Countdown-Modal
-│   │   ├── GamificationPanel.jsx # XP, Streaks, Challenges, Badges
-│   │   ├── XPBar.jsx          # Level- und XP-Fortschrittsbalken
-│   │   ├── BadgeCard.jsx      # Einzelnes Badge (freigeschaltet/gesperrt)
-│   │   ├── StreakTracker.jsx  # Tages- und Wochen-Streak
-│   │   ├── DailyChallengeCard.jsx # Tägliche Challenge mit Fortschritt
-│   │   ├── RewardToast.jsx    # Kurze Belohnung (+XP / Badge)
-│   │   └── LevelUpModal.jsx   # Level-Aufstiegs-Animation
-│   │   ├── Onboarding.jsx     # 3-Schritte-Onboarding (Wasserziel, Notifications)
-│   │   ├── QuickActions.jsx   # Schnellaktionen (Glas, Bewegung, Augen)
-│   │   └── AuthModal.jsx      # Anmelden / Registrieren
+│   │   ├── ReminderCard.jsx      # Card per reminder type
+│   │   ├── SettingsPanel.jsx     # Settings (intervals, notifications, dark mode)
+│   │   ├── ProgressTracker.jsx   # Water progress & stats
+│   │   ├── EyeBreakModal.jsx     # 20-20-20 countdown modal
+│   │   ├── GamificationPanel.jsx # XP, streaks, challenges, badges
+│   │   ├── XPBar.jsx             # Level and XP progress bar
+│   │   ├── BadgeCard.jsx         # Single badge (unlocked/locked)
+│   │   ├── StreakTracker.jsx     # Daily and weekly streak
+│   │   ├── DailyChallengeCard.jsx # Daily challenge with progress
+│   │   ├── RewardToast.jsx       # Short reward (+XP / badge)
+│   │   ├── LevelUpModal.jsx      # Level-up animation
+│   │   ├── Onboarding.jsx        # 3-step onboarding (water goal, notifications)
+│   │   ├── QuickActions.jsx      # Quick actions (glass, movement, eyes)
+│   │   ├── AuthModal.jsx         # Sign in / Register
+│   │   ├── AIAnalysisCard.jsx    # Hydration insights (patterns, forecast, tips)
+│   │   └── PredictiveHealthCard.jsx # Predictive Health scores
 │   ├── hooks/
-│   │   ├── useTimer.js        # Countdown-Hook (z. B. 20 Sek)
-│   │   └── useLocalStorage.js # Persistenz-Hook (optional)
+│   │   ├── useTimer.js           # Countdown hook (e.g. 20 sec)
+│   │   └── useLocalStorage.js    # Persistence hook (optional)
 │   ├── utils/
-│   │   ├── storage.js         # LocalStorage (Settings, Progress, Stats, Gamification)
-│   │   ├── notifications.js  # Web Notifications API
-│   │   ├── gamification.js    # Level aus XP, Badge-Check, Streaks, Challenges
-│   │   └── gamificationUpdate.js # XP/Streak/Badge-Updates pro Aktion
+│   │   ├── storage.js            # LocalStorage (settings, progress, stats, gamification)
+│   │   ├── notifications.js      # Web Notifications API
+│   │   ├── gamification.js       # Level from XP, badge check, streaks, challenges
+│   │   ├── gamificationUpdate.js # XP/streak/badge updates per action
+│   │   ├── aiAnalysis.js         # Pattern detection, goal prediction, recommendations
+│   │   ├── predictiveHealth.js   # Dehydration, performance, fatigue, headache, recovery scores
+│   │   └── weather.js            # Weather for insights (Open-Meteo)
 │   ├── api/
-│   │   └── client.js          # API-Client (Auth + CRUD)
+│   │   └── client.js             # API client (auth + CRUD)
 │   ├── context/
-│   │   └── AuthContext.jsx   # Auth-State (user, token, login, register, logout)
-│   ├── constants.js          # Intervalle, Ziele, Nachrichten, XP, Badges, API_BASE_URL
+│   │   └── AuthContext.jsx       # Auth state (user, token, login, register, logout)
+│   ├── constants.js              # Intervals, goals, messages, XP, badges, API_BASE_URL
 │   ├── App.jsx
 │   ├── main.jsx
 │   └── index.css
-├── server/                   # Backend (Express + SQLite)
+├── server/                        # Backend (Express + SQLite)
 │   ├── index.js
 │   ├── db.js
 │   ├── middleware/auth.js
@@ -78,62 +85,62 @@ hydrobreak/
 └── README.md
 ```
 
-## Setup & Start
+## Setup & run
 
-### Voraussetzungen
+### Requirements
 
-- **Node.js** (z. B. 18+)
-- **npm** oder **yarn**
+- **Node.js** (e.g. 18+)
+- **npm** or **yarn**
 
-### Installation
+### Install
 
 ```bash
 cd hydrobreak
 npm install
 ```
 
-### Entwicklung
+### Development
 
 ```bash
 npm run dev
 ```
 
-App läuft unter **http://localhost:5173** (oder dem angezeigten Port).
+App runs at **http://localhost:5173** (or the port shown).
 
-### Produktion bauen
+### Production build
 
 ```bash
 npm run build
 ```
 
-Ausgabe in `dist/`. Vorschau mit:
+Output in `dist/`. Preview with:
 
 ```bash
 npm run preview
 ```
 
-## Verwendung
+## Usage
 
-1. **Benachrichtigungen**: Einmal „Erlauben“ klicken (Einstellungen), dann können Erinnerungen auch im Hintergrund erscheinen.
-2. **Wasser**: „Jetzt trinken“ addiert 250 ml und startet den Intervall-Timer neu.
-3. **Aufstehen**: „Pause starten“ setzt den Timer für die nächste Erinnerung zurück.
-4. **Augen**: „Pause starten“ öffnet das Modal mit 20-Sekunden-Countdown; danach wird der Intervall-Timer neu gestartet.
-5. **Einstellungen**: Intervalle und Dark Mode in der Einstellungen-Karte anpassen; alles wird in LocalStorage gespeichert.
-6. **Gamification**: XP gibt es für Wasser (+10), Bewegungs-Pause (+15), Augenpause (+15) und abgeschlossene Tages-Challenge (+50). Badges und Streaks werden automatisch vergeben; Level steigen mit Gesamt-XP. Statistiken & Badges im ausklappbaren Bereich unter der Daily Challenge.
-7. **PWA installieren**: Im Browser (Chrome/Edge auf Desktop: Menü → „App installieren“; Safari iOS: Teilen → „Zum Home-Bildschirm“) die App auf dem Gerät installieren. Danach läuft HydroBreak wie eine native App und funktioniert offline (nach dem ersten Laden).
-8. **Backend & Sync**: Optional API starten (`cd server && npm install && npm run dev`). In der App unter **Einstellungen → Account** „Anmelden / Registrieren“. Nach Login werden Einstellungen, Fortschritt, Stats und Gamification mit dem Server synchronisiert; Änderungen werden automatisch hochgeladen.
+1. **Notifications**: Tap “Allow” once (in Settings); reminders can then appear in the background.
+2. **Water**: “Drink now” adds 250 ml and resets the interval timer.
+3. **Stand up**: “Start break” resets the timer for the next reminder.
+4. **Eyes**: “Start break” opens the modal with the 20-second countdown; afterward the interval timer is reset.
+5. **Settings**: Adjust intervals and dark mode in the settings card; everything is saved in LocalStorage.
+6. **Gamification**: XP for water (+10), movement break (+15), eye break (+15), and completed daily challenge (+50). Badges and streaks are awarded automatically; levels increase with total XP. Stats & badges in the expandable section under the Daily Challenge.
+7. **Install PWA**: In the browser (Chrome/Edge on desktop: menu → “Install app”; Safari iOS: Share → “Add to Home Screen”) install the app on your device. HydroBreak then runs like a native app and works offline (after the first load).
+8. **Backend & sync**: Optionally start the API (`cd server && npm install && npm run dev`). In the app under **Settings → Account** use “Sign in / Register”. After login, settings, progress, stats, and gamification sync with the server; changes are uploaded automatically.
 
-### Backend starten
+### Start backend
 
 ```bash
 cd server
 npm install
-cp .env.example .env   # optional: JWT_SECRET, PORT anpassen
+cp .env.example .env   # optional: set JWT_SECRET, PORT
 npm run dev
 ```
 
-API: `http://localhost:3001`. Das Frontend nutzt diese URL standardmäßig; für andere Hosts `VITE_API_URL` in einer `.env` im Projektroot setzen.
+API: `http://localhost:3001`. The frontend uses this URL by default; for other hosts set `VITE_API_URL` in a `.env` in the project root.
 
-## Lizenz
+## License
 
 MIT.

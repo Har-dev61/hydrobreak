@@ -8,8 +8,8 @@ const icons = {
   eye: Eye,
 }
 
-/** Kleiner Fortschritts-Ring (Kreis): 0 = leer, 1 = voll. progress = verstrichene Zeit. */
-function CountdownRing({ progress, size = 36, strokeWidth = 3, className = '' }) {
+/** Kreisrunder Fortschritts-Ring (SVG): 0 = leer, 1 = voll. progress = verstrichene Zeit bis zur nächsten Erinnerung. */
+function CountdownRing({ progress, size = 44, strokeWidth = 4, className = '' }) {
   const r = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * r
   const offset = circumference * (1 - Math.min(1, Math.max(0, progress)))
@@ -91,12 +91,13 @@ function ReminderCard({
             <p className="text-xs text-app-muted-foreground mt-0.5">{subtitle}</p>
           )}
           {nextIn != null && (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-3 mt-2">
               {countdownProgress != null && (
-                <CountdownRing progress={countdownProgress} />
+                <CountdownRing progress={countdownProgress} size={44} strokeWidth={4} />
               )}
-              <p className="text-sm text-app-muted-foreground">
-                {t('reminder.nextIn')} <span className="font-medium text-[var(--app-primary)]">{nextIn}</span>
+              <p className="text-sm text-app-muted-foreground flex items-center gap-1.5">
+                <span>{t('reminder.nextIn')}</span>
+                <span className="font-medium text-[var(--app-primary)] tabular-nums">{nextIn}</span>
               </p>
             </div>
           )}

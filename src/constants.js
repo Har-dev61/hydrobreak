@@ -55,6 +55,22 @@ export const STORAGE_KEYS = {
   GAMIFICATION: 'hydrobreak_gamification',
   ONBOARDING_DONE: 'hydrobreak_onboarding_done',
   LAST_SEEN_VERSION: 'hydrobreak_last_seen_version',
+  DAILY_CONTEXT: 'hydrobreak_daily_context',
+}
+
+/** Kontext für AI-Insights: Standort */
+export const LOCATION_CONTEXT = {
+  HOME: 'home',
+  OFFICE: 'office',
+  OTHER: 'other',
+  UNKNOWN: 'unknown',
+}
+
+/** Kontext für AI-Insights: Aktivitätslevel */
+export const ACTIVITY_LEVEL = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
 }
 
 // ——— Gamification ———

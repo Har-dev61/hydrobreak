@@ -79,3 +79,51 @@ export async function sendPasswordResetEmail(email, code) {
 
   console.log(`[${APP_NAME}] Kein SMTP konfiguriert – Passwort-Reset-Code für ${email}: ${code}`)
 }
+
+/**
+ * Sendet die Wochen-Zusammenfassung (Liter, Pausen, Streak, Badges).
+ * Optional; wird nur ausgeführt, wenn SMTP konfiguriert ist.
+ * weekRangeLabel z. B. "11. – 17. Februar 2026" für bessere E-Mail.
+ */
+export async function sendWeeklyDigest(email, { liters, pauses, streak, badges, weekRangeLabel }) {
+  const subject = `${APP_NAME} – Deine Wochen-Zusammenfassung`
+  const badgesList = Array.isArray(badges) && badges.length ? badges.join(', ') : '–'
+  const weekLine = weekRangeLabel ? `<p style="color:#64748b;font-size:14px;">${weekRangeLabel}</p>` : ''
+  const streakLabel = streak === 1 ? '1 Woche in Folge aktiv' : `${streak} Wochen in Folge aktiv`
+  const html = `
+    <p>Hallo,</p>
+    <p>hier ist deine <strong>${APP_NAME}</strong>-Zusammenfassung der vergangenen Woche.</p>
+    ${weekLine}
+    <table style="border-collapse:collapse;margin:16px 0;" cellpadding="0" cellspacing="0">
+      <tr><td style="padding:6px 12px 6px 0;vertical-align:top;"><strong>💧 Wasser</strong></td><td style="padding:6px 0;">${liters} L getrunken</td></tr>
+      <tr><td style="padding:6px 12px 6px 0;vertical-align:top;"><strong>🔄 Pausen</strong></td><td style="padding:6px 0;">${pauses} (Aufstehen + Augen)</td></tr>
+      <tr><td style="padding:6px 12px 6px 0;vertical-align:top;"><strong>🔥 Streak</strong></td><td style="padding:6px 0;">${streakLabel}</td></tr>
+      <tr><td style="padding:6px 12px 6px 0;vertical-align:top;"><strong>🏅 Badges</strong></td><td style="padding:6px 0;">${badgesList}</td></tr>
+    </table>
+    <p>Bis nächste Woche – bleib dran!</p>
+    <p style="color:#94a3b8;font-size:12px;">– ${APP_NAME}</p>
+  `.trim()
+  const text = [
+    `${APP_NAME} – Deine Wochen-Zusammenfassung`,
+    weekRangeLabel ? weekRangeLabel : '',
+    `Wasser: ${liters} L`,
+    `Pausen: ${pauses} (Aufstehen + Augen)`,
+    `Streak: ${streakLabel}`,
+    `Badges: ${badgesList}`,
+    '',
+    'Bis nächste Woche – bleib dran!',
+    `– ${APP_NAME}`,
+  ].filter(Boolean).join('\n')
+
+  if (transporter) {
+    await transporter.sendMail({
+      from: MAIL_FROM,
+      to: email,
+      subject,
+      html,
+      text,
+    })
+    return
+  }
+  console.log(`[${APP_NAME}] Kein SMTP – Wochen-Digest für ${email} (${liters} L, ${pauses} Pausen, Streak ${streak})`)
+}
